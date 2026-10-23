@@ -1,11 +1,15 @@
-
 import requests
 
+
 def emotion_detector(text_to_analyze):
-    url = "https://sn-watson-emotion.labs.skills.network/v1/watson.runtime.nlp.v1/NlpService/EmotionPredict"
+    url = (
+        "https://sn-watson-emotion.labs.skills.network/"
+        "v1/watson.runtime.nlp.v1/NlpService/EmotionPredict"
+    )
 
     headers = {
-        "grpc-metadata-mm-model-id": "emotion_aggregated-workflow_lang_en_stock"
+        "grpc-metadata-mm-model-id":
+            "emotion_aggregated-workflow_lang_en_stock"
     }
 
     input_json = {
@@ -14,27 +18,45 @@ def emotion_detector(text_to_analyze):
         }
     }
 
-    response = requests.post(url, headers=headers, json=input_json)
-    result = response.json()
+    try:
+        response = requests.post(
+            url,
+            headers=headers,
+            json=input_json,
+            timeout=30
+        )
 
-    emotions = result["emotionPredictions"][0]["emotion"]
+        # Handle blank input or other bad requests
+        if response.status_code == 400:
+            return {
+                "anger": None,
+                "disgust": None,
+                "fear": None,
+                "joy": None,
+                "sadness": None,
+                "dominant_emotion": None
+            }
 
-    anger_score = emotions["anger"]
-    disgust_score = emotions["disgust"]
-    fear_score = emotions["fear"]
-    joy_score = emotions["joy"]
-    sadness_score = emotions["sadness"]
+        response.raise_for_status()
+        result = response.json()
 
-    scores = {
-        "anger": anger_score,
-        "disgust": disgust_score,
-        "fear": fear_score,
-        "joy": joy_score,
-        "sadness": sadness_score
-    }
+        emotions = result["emotionPredictions"][0]["emotion"]
 
-    dominant_emotion = max(scores, key=scores.get)
-    scores["dominant_emotion"] = dominant_emotion
+        scores = {
+            "anger": emotions["anger"],
+            "disgust": emotions["disgust"],
+            "fear": emotions["fear"],
+            "joy": emotions["joy"],
+            "sadness": emotions["sadness"]
+        }
 
-    return scores
+        scores["dominant_emotion"] = max(
+            scores, key=scores.get
+        )
 
+        return scores
+
+    except requests.RequestException:
+        raise
+    except (KeyError, IndexError, TypeError, ValueError):
+        raise ValueError("Unexpected response from emotion API")
